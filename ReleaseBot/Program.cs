@@ -1,46 +1,33 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
-using HtmlAgilityPack;
 
 namespace ReleaseBot
 {
     class Program
     {
         private const int V = 2; // <--- pythonnet_netstandard version!
-        private const string ProjectPath = "../../../src/runtime";
-        private const string ProjectName = "Python.Runtime.csproj";
+        private static readonly string ProjectPath = "WrapperProject";
+        private const string ProjectName = "Python.Runtime.Wrapper.csproj";
         private const string Description = "Pythonnet compiled against .NetStandard 2.0 and CPython ";
         private const string Tags = "Python, pythonnet, interop";
 
         static void Main(string[] args)
         {
-            var win_id = "Python.Runtime.Windows";
-            var linux_id = "Python.Runtime.Linux";
-            var osx_id = "Python.Runtime.OSX";
             var specs = new ReleaseSpec[]
             {
-                // linux                
-                new ReleaseSpec() { Version = "2.7."+V, Description = Description + "2.7 (linux)", PackageId = linux_id, PackageTags = Tags, Constants = "TRACE;PYTHON2;PYTHON27;UCS4;MONO_LINUX;PYTHON_WITH_PYMALLOC", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                new ReleaseSpec() { Version = "3.5."+V, Description = Description + "3.5 (linux)", PackageId = linux_id, PackageTags = Tags, Constants = "TRACE;PYTHON3;PYTHON35;UCS4;MONO_LINUX;PYTHON_WITH_PYMALLOC", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                new ReleaseSpec() { Version = "3.6."+V, Description = Description + "3.6 (linux)", PackageId = linux_id, PackageTags = Tags, Constants = "TRACE;PYTHON3;PYTHON36;UCS4;MONO_LINUX;PYTHON_WITH_PYMALLOC", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                new ReleaseSpec() { Version = "3.7."+V, Description = Description + "3.7 (linux)", PackageId = linux_id, PackageTags = Tags, Constants = "TRACE;PYTHON3;PYTHON37;UCS4;MONO_LINUX;PYTHON_WITH_PYMALLOC", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                // mac
-                new ReleaseSpec() { Version = "2.7."+V, Description = Description + "2.7 (osx)", PackageId = osx_id, PackageTags = Tags, Constants = "TRACE;PYTHON2;PYTHON27;UCS2;MONO_OSX;PYTHON_WITH_PYMALLOC", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                new ReleaseSpec() { Version = "3.5."+V, Description = Description + "3.5 (osx)", PackageId = osx_id, PackageTags = Tags, Constants = "TRACE;PYTHON3;PYTHON35;UCS2;MONO_OSX;PYTHON_WITH_PYMALLOC", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                new ReleaseSpec() { Version = "3.6."+V, Description = Description + "3.6 (osx)", PackageId = osx_id, PackageTags = Tags, Constants = "TRACE;PYTHON3;PYTHON36;UCS2;MONO_OSX;PYTHON_WITH_PYMALLOC", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                new ReleaseSpec() { Version = "3.7."+V, Description = Description + "3.7 (osx)", PackageId = osx_id, PackageTags = Tags, Constants = "TRACE;PYTHON3;PYTHON37;UCS2;MONO_OSX;PYTHON_WITH_PYMALLOC", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                // win
-                new ReleaseSpec() { Version = "2.7."+V, Description = Description + "2.7 (win64)", PackageId = win_id, PackageTags = Tags, Constants = "TRACE;PYTHON2;PYTHON27;UCS2", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                new ReleaseSpec() { Version = "3.5."+V, Description = Description + "3.5 (win64)", PackageId = win_id, PackageTags = Tags, Constants = "TRACE;PYTHON3;PYTHON35;UCS2", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                new ReleaseSpec() { Version = "3.6."+V, Description = Description + "3.6 (win64)", PackageId = win_id, PackageTags = Tags, Constants = "TRACE;PYTHON3;PYTHON36;UCS2", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
-                new ReleaseSpec() { Version = "3.7."+V, Description = Description + "3.7 (win64)", PackageId = win_id, PackageTags = Tags, Constants = "TRACE;PYTHON3;PYTHON37;UCS2", RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
+                new ReleaseSpec() { Version = "2.7."+V, Description = Description + "2.7", PythonMajorVersion = 2, PythonMinorVersion = 7, PackageTags = Tags, RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
+                new ReleaseSpec() { Version = "3.5."+V, Description = Description + "3.5", PythonMajorVersion = 3, PythonMinorVersion = 5, PackageTags = Tags, RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
+                new ReleaseSpec() { Version = "3.6."+V, Description = Description + "3.6", PythonMajorVersion = 3, PythonMinorVersion = 6, PackageTags = Tags, RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
+                new ReleaseSpec() { Version = "3.7."+V, Description = Description + "3.7", PythonMajorVersion = 3, PythonMinorVersion = 7, PackageTags = Tags, RelativeProjectPath = ProjectPath, ProjectName = ProjectName },
 
             };
             foreach (var spec in specs)
@@ -56,16 +43,17 @@ namespace ReleaseBot
                 //}
             }
 
-            var key = File.ReadAllText("../../nuget.key").Trim();
+            var key = File.ReadAllText(Path.Combine("..", "..", "nuget.key")).Trim();
             foreach (var nuget in Directory.GetFiles(Path.Combine(ProjectPath, "bin", "Release"), "*.nupkg"))
             {
                 Console.WriteLine("Push " + nuget);
+                var nugetExePath = Path.Combine(AppContext.BaseDirectory, "nuget.exe");
                 var arg = $"push -Source https://api.nuget.org/v3/index.json -ApiKey {key} {nuget}";                
-                var p = new Process() { StartInfo = new ProcessStartInfo("nuget.exe", arg) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false} };
+                var p = new Process() { StartInfo = new ProcessStartInfo(nugetExePath, arg) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false} };
                 p.OutputDataReceived += (x, data) => Console.WriteLine(data.Data);
                 p.ErrorDataReceived += (x, data) => Console.WriteLine("Error: " + data.Data);
-                p.Start();
-                p.WaitForExit();
+                //p.Start();
+                //p.WaitForExit();
                 Console.WriteLine("... pushed");
             }
             Thread.Sleep(3000);
@@ -80,6 +68,16 @@ namespace ReleaseBot
         public string Version;
 
         /// <summary>
+        /// The Python major version to use
+        /// </summary>
+        public int PythonMajorVersion;
+
+        /// <summary>
+        /// The Python minor version to use
+        /// </summary>
+        public int PythonMinorVersion;
+
+        /// <summary>
         /// Project description
         /// </summary>
         public string Description;
@@ -90,24 +88,14 @@ namespace ReleaseBot
         public string PackageTags;
 
         /// <summary>
-        /// Nuget package id
+        /// Path to the csproj file, relative to the execution directory of ReleaseBot
         /// </summary>
-        public string PackageId;
-
-        /// <summary>
-        /// Project description
-        /// </summary>
-        public string Constants;
+        public string RelativeProjectPath;
 
         /// <summary>
         /// Name of the csproj file
         /// </summary>
         public string ProjectName;
-
-        /// <summary>
-        /// Path to the csproj file, relative to the execution directory of ReleaseBot
-        /// </summary>
-        public string RelativeProjectPath;
 
         public string FullProjectPath => Path.Combine(RelativeProjectPath, ProjectName);
 
@@ -115,36 +103,31 @@ namespace ReleaseBot
         {
             if (!File.Exists(FullProjectPath))
                 throw new InvalidOperationException("Project not found at: "+FullProjectPath);
-            // modify csproj
-            var doc=new HtmlDocument(){ OptionOutputOriginalCase = true, OptionWriteEmptyNodes = true};
-            doc.Load(FullProjectPath);
-            var group0 = doc.DocumentNode.Descendants("propertygroup").FirstOrDefault();
-            SetInnerText(group0.Element("version"), Version);
-            Console.WriteLine("Version: " + group0.Element("version").InnerText);
-            SetInnerText(group0.Element("description"), Description);
-            Console.WriteLine("Description: " + group0.Element("description").InnerText);
-            SetInnerText(group0.Element("packageid"), PackageId);
-            foreach (var group in doc.DocumentNode.Descendants("propertygroup"))
+            
+            // Pack in release mode
+            Console.WriteLine("Pack " + Description);
+            var dotnetArguments = new[]
             {
-                var configuration = group.Attributes["condition"]?.Value;
-                if (configuration==null)
-                    continue;
-                var is_release = configuration.Contains("Release");
-                var constants = group.Element("defineconstants");
-                SetInnerText(constants, (is_release ? "" : "DEBUG;") + Constants);
-                Console.WriteLine("Constants: " + constants.InnerText);
-            }
-            doc.Save(FullProjectPath);
-            // now build in release mode
-            Console.WriteLine("Build " + Description);
-            var p=new Process(){ StartInfo = new ProcessStartInfo("dotnet", "build -c Release") { WorkingDirectory = Path.GetFullPath(RelativeProjectPath) } };
+                "pack",
+                "-c Release",
+                EscapeCommandLineArgument("-p:Version=" + Version),
+                EscapeCommandLineArgument($@"-p:Description=""{Description}"""),
+                "-p:PythonMajorVersion=" + PythonMajorVersion.ToString(CultureInfo.InvariantCulture),
+                "-p:PythonMinorVersion=" + PythonMinorVersion.ToString(CultureInfo.InvariantCulture),
+                EscapeCommandLineArgument($@"-p:PackageTags=""{PackageTags}""")
+            };
+            
+            var p=new Process(){ StartInfo = new ProcessStartInfo("dotnet", string.Join(" ", dotnetArguments)) { WorkingDirectory = Path.GetFullPath(RelativeProjectPath) } };
             p.Start();
             p.WaitForExit();
         }
 
-        private void SetInnerText(HtmlNode node, string text)
+        private static string EscapeCommandLineArgument(string arg)
         {
-            node.ReplaceChild(HtmlTextNode.CreateNode(text), node.FirstChild);
+            // http://stackoverflow.com/a/6040946/784387
+            arg = Regex.Replace(arg, @"(\\*)" + "\"", @"$1$1\" + "\"");
+            arg = "\"" + Regex.Replace(arg, @"(\\+)$", @"$1$1") + "\"";
+            return arg;
         }
     }
 }

@@ -1,0 +1,145 @@
+<Project>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <!--
+      This file is created as .csproj even though there is no C# code involved
+      (it's easier to deactive compilation rather than implement the necessary compilation targets as empty)
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>Python.Runtime</PackageId>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Disable everything to do with compiling code for this project file -->
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoBuild>true</NoBuild>
+    <!-- don't warn about no code and no RuntimeMetadataVersion -->
+    <NoWarn>$(NoWarn);CS2008;CS8021</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\runtime\Python.Runtime.csproj"
+                        ReferenceOutputAssembly="False"
+                        PrivateAssets="All"
+                        Publish="False" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackRuntimeIdentifierConfiguration Include="win-x64"
+                        DefineConstantsOverride="$(BaseDefineConstantsOverride);UCS2"
+                        UseAsReferenceAssemblySource="True" />
+    <PackRuntimeIdentifierConfiguration Include="osx-x64"
+                        DefineConstantsOverride="$(BaseDefineConstantsOverride);UCS2;MONO_OSX;PYTHON_WITH_PYMALLOC" />
+    <PackRuntimeIdentifierConfiguration Include="linux-x64"
+                        DefineConstantsOverride="$(BaseDefineConstantsOverride);UCS4;MONO_LINUX;PYTHON_WITH_PYMALLOC" />
+  </ItemGroup>
+  
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+  <!-- This needs to be below the Sdk.targets import to consume the generated defaults -->
+  <PropertyGroup>
+    <PythonMajorVersion Condition="'$(PythonMajorVersion)' == ''">3</PythonMajorVersion>
+    <PythonMinorVersion Condition="'$(PythonMinorVersion)' == ''">7</PythonMinorVersion>
+    <BaseDefineConstantsOverride>TRACE;$(ImplicitConfigurationDefine);$(VersionlessImplicitFrameworkDefine);$(ImplicitFrameworkDefine);PYTHON$(PythonMajorVersion);PYTHON$(PythonMajorVersion)$(PythonMinorVersion)</BaseDefineConstantsOverride>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Clear metadata so that the output items won't copy over metadata set on the p2p reference-->
+    <_ProjectReferenceWithoutMetadata Include="@(ProjectReference->ClearMetadata())" />
+  </ItemGroup>
+
+  <!--
+      Hook our custom logic into the appropriate places
+  -->
+  <Target Name="_ApplyNuGetMetadataForRestore"
+  DependsOnTargets="ApplyNuGetMetadataFromReferencedProject" BeforeTargets="CollectPackageReferences" />
+  <PropertyGroup>
+    <GenerateNuspecDependsOn>ApplyNuGetMetadataFromReferencedProject;CreateRidSpecificPackageContents;$(GenerateNuspecDependsOn)</GenerateNuspecDependsOn>
+  </PropertyGroup>
+
+  <!--
+      Logic to read and apply NuGet metadata from remote project files.
+      Does not set PackageId and PackageVersion, since this shall be set for this project.
+  -->
+  <Target Name="ApplyNuGetMetadataFromReferencedProject">
+    <MSBuild Projects="@(_ProjectReferenceWithoutMetadata)"
+            Targets="GetNuGetMetadata"
+            Properties="MSBuildProjectExtensionsPath=$(MSBuildThisFileDirectory)\InjectedTargets\">
+            <Output TaskParameter="TargetOutputs" ItemName="NuGetMetadata" />
+    </MSBuild>
+    <PropertyGroup>
+      <Title>%(NuGetMetadata.Title)</Title>
+      <Authors>%(NuGetMetadata.Authors)</Authors>
+      <Description>%(NuGetMetadata.Description)</Description>
+      <PackageDescription Condition="'$(Description)' != '' and '$(PackageDescription)' == 'Package Description'"></PackageDescription>
+      <Copyright>%(NuGetMetadata.Copyright)</Copyright>
+      <RequireLicenseAcceptance>%(NuGetMetadata.RequireLicenseAcceptance)</RequireLicenseAcceptance>
+      <PackageLicenseUrl>%(NuGetMetadata.PackageLicenseUrl)</PackageLicenseUrl>
+      <PackageProjectUrl>%(NuGetMetadata.PackageProjectUrl)</PackageProjectUrl>
+      <PackageIconUrl>%(NuGetMetadata.PackageIconUrl)</PackageIconUrl>
+      <PackageReleaseNotes>%(NuGetMetadata.PackageReleaseNotes)</PackageReleaseNotes>
+      <PackageTags>%(NuGetMetadata.PackageTags)</PackageTags>
+      <DevelopmentDependency>%(NuGetMetadata.DevelopmentDependency)</DevelopmentDependency>
+      <AssemblyName>%(NuGetMetadata.AssemblyName)</AssemblyName>
+      <PackageType>%(NuGetMetadata.PackageType)</PackageType>
+      <RepositoryUrl>%(NuGetMetadata.RepositoryUrl)</RepositoryUrl>
+      <RepositoryType>%(NuGetMetadata.RepositoryType)</RepositoryType>
+      <RepositoryBranch>%(NuGetMetadata.RepositoryBranch)</RepositoryBranch>
+      <RepositoryCommit>%(NuGetMetadata.RepositoryCommit)</RepositoryCommit>
+      <NoPackageAnalysis>%(NuGetMetadata.NoPackageAnalysis)</NoPackageAnalysis>
+      <NoDefaultExcludes>%(NuGetMetadata.NoDefaultExcludes)</NoDefaultExcludes>
+      <MinClientVersion>%(NuGetMetadata.MinClientVersion)</MinClientVersion>
+      <AllowedOutputExtensionsInPackageBuildOutputFolder>%(NuGetMetadata.AllowedOutputExtensionsInPackageBuildOutputFolder)</AllowedOutputExtensionsInPackageBuildOutputFolder>
+      <AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder>%(NuGetMetadata.AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder)</AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder>
+      <PackageLicenseExpression>%(NuGetMetadata.PackageLicenseExpression)</PackageLicenseExpression>
+      <PackageLicenseExpressionVersion>%(NuGetMetadata.PackageLicenseExpressionVersion)</PackageLicenseExpressionVersion>
+    </PropertyGroup>
+
+    <!-- Raise package references to behave as transitive references -->
+    <MSBuild Projects="@(_ProjectReferenceWithoutMetadata)"
+            Targets="GetDirectPackageReferences"
+            Properties="MSBuildProjectExtensionsPath=$(MSBuildThisFileDirectory)\InjectedTargets\">
+            <Output TaskParameter="TargetOutputs" ItemName="PackageReference" />
+    </MSBuild>
+  </Target>
+
+  <Target Name="CreateRidSpecificPackageContents">
+    <PropertyGroup>
+      <TemporaryBuildLocation>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)\TempReferenceOutputs\'))</TemporaryBuildLocation>
+    </PropertyGroup>
+    <ItemGroup>
+      <RidSpecificProjectReference Include="@(ProjectReference)"
+                                  PackRuntimeIdentifier="%(PackRuntimeIdentifierConfiguration.Identity)"
+                                  UseAsReferenceAssemblySource="%(PackRuntimeIdentifierConfiguration.UseAsReferenceAssemblySource)"
+                                  AdditionalProperties="Version=$(Version);GeneratePackageOnBuild=False;IntermediateOutputPath=$(TemporaryBuildLocation)%(PackRuntimeIdentifierConfiguration.Identity)\obj\;BaseOutputPath=$(TemporaryBuildLocation)%(PackRuntimeIdentifierConfiguration.Identity)\bin\;DefineConstants=%(PackRuntimeIdentifierConfiguration.DefineConstantsOverride);ProduceReferenceAssembly=%(PackRuntimeIdentifierConfiguration.UseAsReferenceAssemblySource)"/>
+    </ItemGroup>
+    <MSBuild Projects="@(RidSpecificProjectReference)" Targets="Build" />
+    <MSBuild Projects="@(RidSpecificProjectReference)"
+            Targets="BuiltProjectOutputGroup;DocumentationProjectOutputGroup;SatelliteDllsProjectOutputGroup;DebugSymbolsProjectOutputGroup">
+            <Output TaskParameter="TargetOutputs" ItemName="ProjectReferenceOutput" />
+    </MSBuild>
+    <ItemGroup>
+      <None Include="@(ProjectReferenceOutput)" Pack="True" PackagePath="runtimes\%(ProjectReferenceOutput.PackRuntimeIdentifier)\lib\$(TargetFramework)" />
+    </ItemGroup>
+
+    <!-- Include reference assembly -->
+    <MSBuild Projects="@(RidSpecificProjectReference->WithMetadataValue('UseAsReferenceAssemblySource', 'True'))" Targets="GetTargetPathWithTargetPlatformMoniker">
+      <Output TaskParameter="TargetOutputs" ItemName="ProjectReferenceTargetPath" />
+    </MSBuild>
+    <PropertyGroup>
+      <ReferenceAssemblyToPack>%(ProjectReferenceTargetPath.ReferenceAssembly)</ReferenceAssemblyToPack>
+    </PropertyGroup>
+    <ItemGroup>
+      <None Include="$(ReferenceAssemblyToPack)" Pack="True" PackagePath="ref\$(TargetFramework)" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <FileWrites Include="$(TemporaryBuildLocation)**\*" />
+    </ItemGroup>
+  </Target>
+
+</Project>

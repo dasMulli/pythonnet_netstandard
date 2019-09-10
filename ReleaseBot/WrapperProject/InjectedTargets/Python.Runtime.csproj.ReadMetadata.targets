@@ -1,0 +1,40 @@
+<Project>
+
+  <Target Name="GetNuGetMetadata" Returns="@(NuGetMetadata)">
+    <ItemGroup>
+      <NuGetMetadata Include="$(MSBuildProjectFile)"
+                Title="$(Title)"
+                Authors="$(Authors)"
+                Description="$(PackageDescription)"
+                Copyright="$(Copyright)"
+                RequireLicenseAcceptance="$(PackageRequireLicenseAcceptance)"
+                PackageLicenseUrl="$(PackageLicenseUrl)"
+                PackageProjectUrl="$(PackageProjectUrl)"
+                PackageIconUrl="$(PackageIconUrl)"
+                ReleaseNotes="$(PackageReleaseNotes)"
+                PackageTags="$(PackageTags)"
+                DevelopmentDependency="$(DevelopmentDependency)"
+                AssemblyName="$(AssemblyName)"
+                PackageTypes="$(PackageType)"
+                RepositoryUrl="$(RepositoryUrl)"
+                RepositoryType="$(RepositoryType)"
+                RepositoryBranch="$(RepositoryBranch)"
+                RepositoryCommit="$(RepositoryCommit)"
+                NoPackageAnalysis="$(NoPackageAnalysis)"
+                NoDefaultExcludes="$(NoDefaultExcludes)"
+                MinClientVersion="$(MinClientVersion)"
+                AllowedOutputExtensionsInPackageBuildOutputFolder="$(AllowedOutputExtensionsInPackageBuildOutputFolder)"
+                AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder="$(AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder)"
+                PackageLicenseExpression="$(PackageLicenseExpression)"
+                PackageLicenseExpressionVersion="$(PackageLicenseExpressionVersion)"
+            />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="GetDirectPackageReferences" Returns="@(NuGetDirectPackageReferences)">
+    <ItemGroup>
+      <NuGetDirectPackageReferences Include="@(PackageReference)" Condition="'%(PackageReference.IsImplicitlyDefined)' != 'true'" />
+    </ItemGroup>
+  </Target>
+
+</Project>
